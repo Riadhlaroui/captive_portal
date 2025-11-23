@@ -6,21 +6,17 @@
 		<title>Wi-Fi Access Portal</title>
 		<link rel="stylesheet" href="/templates/style/output.css" />
 	</head>
-	<body
-		class="h-screen flex items-center justify-center bg-gray-100 text-gray-900"
-	>
-		<div
-			class="w-full max-w-sm bg-white rounded-xl shadow-lg p-8 text-center mx-4"
-		>
+	<body class="h-screen flex items-center justify-center bg-[#0A0A0A]">
+		<div class="w-full max-w-sm rounded-xl shadow-lg p-8 text-center mx-4">
 			<h1 class="text-2xl font-bold mb-2 text-gray-800">Welcome Guest</h1>
 			<p class="text-gray-500 mb-8">Click below to go online.</p>
 
 			<form action="/authorize" method="POST" class="space-y-4">
 				<button
 					type="submit"
-					class="w-full text-black font-semibold py-3 px-4 border border-black bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] active:translate-x-[4px] active:translate-y-[4px] transition-all duration-150"
+					class="w-full font-semibold py-3 px-4 bg-[#030406] text-white border border-[#181818] rounded-[7px]"
 				>
-					Connect to Internet
+					<span class="relative z-10">Connect to Internet</span>
 				</button>
 			</form>
 

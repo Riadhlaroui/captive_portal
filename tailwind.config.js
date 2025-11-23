@@ -1,8 +1,19 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-	content: ["./templates/**/*.html"],
+	content: ["./**/*.html"],
 	theme: {
-		extend: {},
+		extend: {
+			keyframes: {
+				shine: {
+					"0%": { left: "-100%" },
+					"50%": { left: "150%" },
+					"100%": { left: "150%" },
+				},
+			},
+			animation: {
+				shine: "shine 2s linear infinite",
+			},
+		},
 	},
 	plugins: [],
 };
