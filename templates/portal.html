@@ -4,25 +4,22 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Wi-Fi Access Portal</title>
-		<link rel="stylesheet" href="/templates/style/output.css" />
+		<link rel="stylesheet" href="/templates/style/style.css" />
 	</head>
-	<body class="h-screen flex items-center justify-center bg-[#0A0A0A]">
-		<div class="w-full max-w-sm rounded-xl shadow-lg p-8 text-center mx-4">
-			<h1 class="text-2xl font-bold mb-2 text-gray-800">Welcome Guest</h1>
-			<p class="text-gray-500 mb-8">Click below to go online.</p>
+	<body>
+		<div class="card">
+			<h1>Welcome Guest</h1>
+			<p>Click below to go online.</p>
 
-			<form action="/authorize" method="POST" class="space-y-4">
-				<button
-					type="submit"
-					class="w-full font-semibold py-3 px-4 bg-[#030406] text-white border border-[#181818] rounded-[7px]"
-				>
-					<span class="relative z-10">Connect to Internet</span>
+			<form action="/authorize" method="POST">
+				<button type="submit">
+					<span>Connect to Internet</span>
 				</button>
 			</form>
 
-			<div class="mt-6 text-xs text-gray-400">
+			<div class="tos">
 				By connecting, you agree to our
-				<a href="#" class="underline hover:text-blue-600">Terms of Service</a>.
+				<a href="#">Terms of Service</a>.
 			</div>
 		</div>
 	</body>
