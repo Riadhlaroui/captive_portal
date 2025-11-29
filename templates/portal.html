@@ -4,7 +4,81 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Wi-Fi Access Portal</title>
-		<link rel="stylesheet" href="/templates/style/style.css" />
+		<style>
+			/* Page background + center content */
+			body {
+				background: #0a0a0a;
+				height: 100vh;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				margin: 0;
+				font-family: Arial, sans-serif;
+			}
+
+			/* Main card */
+			.card {
+				width: 100%;
+				max-width: 400px;
+				background: #ffffff;
+				padding: 2rem;
+				border-radius: 15px;
+				text-align: center;
+				box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+				margin: 0 1rem;
+			}
+
+			/* Header text */
+			.card h1 {
+				font-size: 1.8rem;
+				font-weight: bold;
+				color: #2e2e2e;
+				margin-bottom: 10px;
+			}
+
+			/* Subtitle text */
+			.card p {
+				color: #6b6b6b;
+				margin-bottom: 2rem;
+				font-size: 0.95rem;
+			}
+
+			/* Button */
+			.card button {
+				width: 100%;
+				padding: 14px 18px;
+				font-size: 1rem;
+				font-weight: 600;
+				background: #030406;
+				color: #fff;
+				border: 1px solid #181818;
+				border-radius: 7px;
+				cursor: pointer;
+				transition: 0.25s ease;
+			}
+
+			.card button:hover {
+				background: #101217;
+				transform: translateY(-1px);
+			}
+
+			/* Terms text */
+			.tos {
+				margin-top: 20px;
+				font-size: 0.75rem;
+				color: #a0a0a0;
+			}
+
+			.tos a {
+				color: #a0a0a0;
+				text-decoration: underline;
+				transition: 0.2s;
+			}
+
+			.tos a:hover {
+				color: #3b82f6; /* blue-500 */
+			}
+		</style>
 	</head>
 	<body>
 		<div class="card">
