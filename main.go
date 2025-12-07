@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -18,6 +19,36 @@ var ctx = context.Background()
 var rdb = redis.NewClient(&redis.Options{
 	Addr: "127.0.0.1:6379", // Redis
 })
+
+func getHostnameCached(ip string) string {
+	// 1) Try Redis cache
+	h := rdb.Get(ctx, "HOST:"+ip).Val()
+	if h != "" {
+		return h
+	}
+
+	// 2) Resolve hostname (slow)
+	h = getHostname(ip)
+
+	// 3) Cache result for 24 hours
+	rdb.Set(ctx, "HOST:"+ip, h, 24*time.Hour)
+	return h
+}
+
+func getDHCPName(ip string) string {
+	data, err := os.ReadFile("/var/lib/misc/dnsmasq.leases")
+	if err != nil {
+		return "unknown"
+	}
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) >= 4 && fields[2] == ip {
+			return fields[3] // client-provided name
+		}
+	}
+	return "unknown"
+}
 
 func allowIP(ip string) {
 	commands := []string{
@@ -50,13 +81,13 @@ func cleanupDevice(ip string) {
 	mac := rdb.Get(ctx, "IP:"+ip).Val()
 
 	// Remove iptables rules
-	cmds := []string{
-		fmt.Sprintf("iptables -t nat -D CAPTIVE_PORTAL -s %s -j RETURN 2>/dev/null", ip),
-		fmt.Sprintf("iptables -D FORWARD -i wlan1 -s %s -j ACCEPT 2>/dev/null", ip),
-	}
-	for _, cmd := range cmds {
-		exec.Command("bash", "-c", cmd).Run()
-	}
+	exec.Command("bash", "-c",
+		fmt.Sprintf("hostapd_cli -i wlan1 deauthenticate %s", mac),
+	).Run()
+
+	exec.Command("bash", "-c",
+		fmt.Sprintf("ip neigh del %s dev wlan1", ip),
+	).Run()
 
 	// Remove IP and MAC from Redis
 	rdb.Del(ctx, "IP:"+ip)
@@ -89,6 +120,10 @@ func getHostname(ip string) string {
 	return "unknown"
 }
 
+func redirectPortal(c *gin.Context) {
+	c.Redirect(302, "/")
+}
+
 func main() {
 	router := gin.Default()
 	router.LoadHTMLGlob("templates/*.html")
@@ -98,10 +133,22 @@ func main() {
 		c.HTML(200, "portal.html", nil)
 	})
 
-	// Android captive portal check
-	router.GET("/generate_204", func(c *gin.Context) {
-		c.Redirect(302, "/") // redirect captive check to portal
+	// Android captive portal checks
+	router.GET("/generate_204", redirectPortal)
+	router.GET("/gen_204", redirectPortal)
+
+	// iOS & macOS captive portal checks
+	router.GET("/hotspot-detect.html", redirectPortal)
+	router.GET("/library/test/success.html", redirectPortal)
+
+	// Windows captive portal checks
+	router.GET("/ncsi.txt", func(c *gin.Context) {
+		c.Redirect(302, "/")
 	})
+	router.GET("/connecttest.txt", redirectPortal)
+
+	// ChromeOS
+	router.GET("/checkconnectivity.txt", redirectPortal)
 
 	// Authorization form submission
 	router.POST("/authorize", func(c *gin.Context) {
@@ -126,7 +173,16 @@ func main() {
 			return
 		}
 
-		// Save MAC & IP
+		name := rdb.Get(ctx, "NAME:"+mac).Val()
+		if name == "" || name == "Unknown" {
+			name = getDHCPName(ip)
+			if name != "unknown" {
+				rdb.Set(ctx, "NAME:"+mac, name, 24*time.Hour)
+			}
+		}
+
+		// Save information
+		rdb.Set(ctx, "NAME:"+mac, name, 24*time.Hour)
 		rdb.Set(ctx, "MAC:"+mac, "allowed", 24*time.Hour)
 		rdb.Set(ctx, "IP:"+ip, mac, 24*time.Hour)
 
@@ -155,27 +211,21 @@ func main() {
 	go func() {
 		for {
 			keys, _ := rdb.Keys(ctx, "IP:*").Result()
-
 			for _, k := range keys {
 				ip := strings.TrimPrefix(k, "IP:")
-
-				// Check ARP table for current status
 				out, _ := exec.Command("bash", "-c",
-					fmt.Sprintf("ip neigh | grep '%s' | awk '{print $NF}'", ip)).Output()
-				status := strings.TrimSpace(string(out))
+					fmt.Sprintf("ip neigh show %s | awk '{print $NF}'", ip)).Output()
+				state := strings.TrimSpace(string(out))
 
-				// If device disappeared or unreachable
-				if status == "" || status == "FAILED" || status == "INCOMPLETE" {
+				if state != "REACHABLE" && state != "STALE" {
 					cleanupDevice(ip)
 				}
 			}
-
 			time.Sleep(5 * time.Second)
 		}
 	}()
 
 	// Admin: list authorized IPs
-
 	router.GET("/admin", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "admin.html", nil)
 	})
@@ -183,52 +233,27 @@ func main() {
 	// Go to http://192.168.10.1:8080/admin to view connected devices
 	router.GET("/admin/data", func(c *gin.Context) {
 		devices := []gin.H{}
+		iter := rdb.Scan(ctx, 0, "IP:*", 200).Iterator()
 
-		// 1️⃣ Add authorized devices from Redis
-		keys, _ := rdb.Keys(ctx, "IP:*").Result()
-		for _, k := range keys {
-			ip := strings.TrimPrefix(k, "IP:")
-			mac := rdb.Get(ctx, k).Val()
-			hostname := getHostname(ip)
+		for iter.Next(ctx) {
+			key := iter.Val() // "IP:192.168.10.25"
+			ip := strings.TrimPrefix(key, "IP:")
+
+			mac := rdb.Get(ctx, key).Val()
+			name := rdb.Get(ctx, "NAME:"+mac).Val()
+
+			hostname := getHostnameCached(ip) // optional but fast
+
 			devices = append(devices, gin.H{
+				"name":     name,
 				"hostname": hostname,
 				"ip":       ip,
 				"mac":      mac,
 			})
 		}
 
-		// 2️⃣ Scan ARP table for all connected devices
-		out, _ := exec.Command("bash", "-c", "ip neigh show | grep -v FAILED").Output()
-		lines := strings.Split(string(out), "\n")
-		for _, line := range lines {
-			if line == "" {
-				continue
-			}
-			fields := strings.Fields(line)
-			if len(fields) < 5 {
-				continue
-			}
-			ip := fields[0]
-			mac := fields[4]
-
-			// Skip if already in devices
-			exists := false
-			for _, d := range devices {
-				if d["ip"] == ip {
-					exists = true
-					break
-				}
-			}
-			if exists {
-				continue
-			}
-
-			hostname := getHostname(ip)
-			devices = append(devices, gin.H{
-				"hostname": hostname,
-				"ip":       ip,
-				"mac":      mac,
-			})
+		if err := iter.Err(); err != nil {
+			log.Println("Redis scan error:", err)
 		}
 
 		c.JSON(200, gin.H{"devices": devices})
@@ -237,24 +262,10 @@ func main() {
 	// Kick a device
 	router.POST("/admin/kick/:ip", func(c *gin.Context) {
 		ip := c.Param("ip")
-
-		// Remove iptables rules
-		cleanup := []string{
-			fmt.Sprintf("iptables -t nat -D CAPTIVE_PORTAL -s %s -j RETURN 2>/dev/null", ip),
-			fmt.Sprintf("iptables -D FORWARD -i wlan1 -s %s -j ACCEPT 2>/dev/null", ip),
-		}
-		for _, cmd := range cleanup {
-			exec.Command("bash", "-c", cmd).Run()
-		}
-
-		// Delete only the IP entry
-		mac := rdb.Get(ctx, "IP:"+ip).Val()
-		rdb.Del(ctx, "IP:"+ip)
-
+		cleanupDevice(ip)
 		c.JSON(200, gin.H{
 			"status": "kicked",
 			"ip":     ip,
-			"mac":    mac,
 		})
 	})
 

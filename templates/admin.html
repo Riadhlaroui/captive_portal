@@ -39,6 +39,7 @@
 			button:hover {
 				background-color: #c0392b;
 			}
+
 			/* Loading overlay */
 			#loading {
 				display: none;
@@ -61,6 +62,7 @@
 				border-radius: 50%;
 				animation: spin 1s linear infinite;
 			}
+
 			@keyframes spin {
 				0% {
 					transform: rotate(0deg);
@@ -73,9 +75,11 @@
 	</head>
 	<body>
 		<h2>Connected Devices</h2>
+
 		<table>
 			<thead>
 				<tr>
+					<th>Client Name</th>
 					<th>Hostname</th>
 					<th>IP Address</th>
 					<th>MAC Address</th>
@@ -85,18 +89,15 @@
 			<tbody id="device-table"></tbody>
 		</table>
 
-		<!-- Loading overlay -->
-		<div id="loading">
-			<div></div>
-		</div>
+		<div id="loading"><div></div></div>
 
 		<script>
 			const loading = document.getElementById("loading");
-			let devicesFound = false; // <-- once true, loading stops forever
+			let firstResponse = false;
 
 			async function loadDevices() {
-				if (!devicesFound) {
-					loading.style.display = "flex"; // show loading ONLY until devices appear
+				if (!firstResponse) {
+					loading.style.display = "flex";
 				}
 
 				try {
@@ -106,29 +107,24 @@
 					const tbody = document.getElementById("device-table");
 					tbody.innerHTML = "";
 
-					// If devices appear → stop loading permanently
-					if (data.devices.length > 0 && !devicesFound) {
-						devicesFound = true;
+					if (!firstResponse) {
+						firstResponse = true;
 						loading.style.display = "none";
 					}
 
 					data.devices.forEach((d) => {
 						const tr = document.createElement("tr");
 						tr.innerHTML = `
-					<td>${d.hostname}</td>
-					<td>${d.ip}</td>
-					<td>${d.mac}</td>
-					<td><button onclick="kick('${d.ip}')">Kick</button></td>
-				`;
+							<td>${d.name || "Unknown"}</td>
+							<td>${d.hostname || "Unknown"}</td>
+							<td>${d.ip}</td>
+							<td>${d.mac}</td>
+							<td><button onclick="kick('${d.ip}')">Kick</button></td>
+						`;
 						tbody.appendChild(tr);
 					});
 				} catch (err) {
 					console.error(err);
-				} finally {
-					// If no devices found yet, keep loading visible.
-					if (devicesFound) {
-						loading.style.display = "none";
-					}
 				}
 			}
 
@@ -139,7 +135,7 @@
 			}
 
 			loadDevices();
-			setInterval(loadDevices, 1000);
+			setInterval(loadDevices, 5000);
 		</script>
 	</body>
 </html>
