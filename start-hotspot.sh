@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Old version of start-hotspot.sh without IPSet
 # Function to clean up when exiting
 cleanup() {
     echo "Stopping hotspot and captive portal..."
