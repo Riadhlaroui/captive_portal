@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Configuration
-# --------------------
 HOTSPOT_IF="wlan1"       # The interface users connect to
 INTERNET_IF="wlan0"      # The interface providing internet (WAN)
 PORTAL_IP="192.168.10.1" # The gateway IP
@@ -18,7 +17,7 @@ cleanup() {
     # Flush iptables
     sudo iptables -t nat -F
     sudo iptables -F
-    sudo iptables -X  # Delete custom chains
+    sudo iptables -X  
 
     # Destroy the IP set
     sudo ipset destroy $IPSET_NAME
@@ -56,19 +55,14 @@ sudo ip link set $HOTSPOT_IF up
 echo "Starting DNSMasq..."
 sudo dnsmasq --conf-file=/etc/dnsmasq-test.conf --no-daemon &
 DNSMASQ_PID=$!
-
-# ----------------------------------------------------------------
-# IPSET SETUP (The Magic Part)
-# ----------------------------------------------------------------
+-
 echo "Initializing IPSet..."
 # Create the set if it doesn't exist
 sudo ipset create $IPSET_NAME hash:ip -exist
 # Clear it to ensure no stale users from last session
 sudo ipset flush $IPSET_NAME
 
-# ----------------------------------------------------------------
-# IPTABLES RULES
-# ----------------------------------------------------------------
+
 echo "Applying Firewall Rules..."
 
 # Flush old rules
@@ -103,16 +97,13 @@ sudo iptables -t nat -A PREROUTING -i $HOTSPOT_IF -p udp --dport 53 -j DNAT --to
 # We REJECT instead of DROP so the browser fails fast and tries HTTP/Gen204 check
 sudo iptables -A FORWARD -i $HOTSPOT_IF -p tcp --dport 443 -j REJECT --reject-with tcp-reset
 
-# ----------------------------------------------------------------
-# START SERVICES
-# ----------------------------------------------------------------
 
 # Start access point
 echo "Starting Hostapd..."
 sudo hostapd /etc/hostapd/hostapd.conf &
 HOSTAPD_PID=$!
 
-# Start Go captive portal (run as root!)
+# Start Go captive portal
 echo "Starting Go Portal..."
 cd /home/riadh/Desktop/projects/captive-portal
 sudo go run main.go &
